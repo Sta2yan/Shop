@@ -10,17 +10,25 @@ namespace Shop
     {
         static void Main(string[] args)
         {
+            int maximumPlayerMoney = 1000;
+            int minimumPlayerMoney = 500;
+            int maximumQuantityProduct = 50;
+            int minimumQuantityProduct = 10;
+
             Random random = new Random();
             Salesman salesman = new Salesman();
-            Player player = new Player(random.Next(500, 1000));
+            Player player = new Player(random.Next(minimumPlayerMoney, maximumPlayerMoney));
+            Stack stack;
+            Product product;
 
-            salesman.AddProduct(new Stack(new Product("Хлеб", 40), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Бутылка воды", 20), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Колбаса", 250), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Сыр", 200), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Чипсы", 70), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Сухарики", 30), random.Next(10, 50)));
-            salesman.AddProduct(new Stack(new Product("Дошик", 20), random.Next(10, 50)));
+
+            salesman.AddProduct(new Stack(new Product("Хлеб", 40), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Бутылка воды", 20), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Колбаса", 250), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Сыр", 200), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Чипсы", 70), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Сухарики", 30), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
+            salesman.AddProduct(new Stack(new Product("Дошик", 20), random.Next(minimumQuantityProduct, maximumQuantityProduct)));
 
             bool isTrade = true;
 
@@ -75,16 +83,30 @@ namespace Shop
 
     abstract class Member
     {
-        protected List<Stack> _stackProducts = new List<Stack>();
+        protected List<Stack> StackProducts = new List<Stack>();
 
         abstract public void ShowListOfProducts();
-
-        abstract public void AddProduct(Stack products);
+        
+        public void AddProduct(Stack products)
+        {
+            StackProducts.Add(products);
+        }
     }
 
     class Salesman : Member
     {
+        private Stack _stackSellProduct;
+
         public int QuantitySellProduct { get; private set; }
+        public Stack StackSellProduct { get { return _stackSellProduct; } }
+
+        public override void ShowListOfProducts()
+        {
+            for (int i = 0; i < StackProducts.Count; i++)
+            {
+                Console.WriteLine($"{i + 1}. Продукт - {StackProducts[i].Product.Name} | Цена - {StackProducts[i].Product.Price} | В наличии - {StackProducts[i].Quantity}");
+            }
+        }
 
         public void SellProduct(Player player)
         {
@@ -98,31 +120,13 @@ namespace Shop
             Console.Write("\nВведите кол-во товара, который хотите приобрести: ");
             QuantitySellProduct = Program.GetNumber(Console.ReadLine());
 
-            Stack product;
-
-            if (TrySellProduct(numberProduct, out product))
+            if (TrySellProduct(numberProduct, out _stackSellProduct))
             {
-                player.BuyProduct(product, QuantitySellProduct);
-                product.ReduceQuantity(this);
+                player.BuyProduct(this);
             }
             else
             {
                 Console.WriteLine("Не удалось найти товар. Покупка отменена");
-            }
-            
-            QuantitySellProduct = 0;
-        }
-
-        public override void AddProduct(Stack stackProducts)
-        {
-            _stackProducts.Add(stackProducts);
-        }
-
-        public override void ShowListOfProducts()
-        {
-            for (int i = 0; i < _stackProducts.Count; i++)
-            {
-                Console.WriteLine($"{i + 1}. Продукт - {_stackProducts[i].Product.Name} | Цена - {_stackProducts[i].Product.Price} | В наличии - {_stackProducts[i].Quantity}");
             }
         }
 
@@ -130,13 +134,13 @@ namespace Shop
         {
             product = null;
 
-            if (index >= _stackProducts.Count || index < 0)
+            if (index >= StackProducts.Count || index < 0)
             {
                 return false;
             }
-            else if (QuantitySellProduct <= _stackProducts[index].Quantity)
+            else if (QuantitySellProduct <= StackProducts[index].Quantity)
             {
-                product = _stackProducts[index];
+                product = StackProducts[index];
                 return true;
             }
             else
@@ -159,11 +163,11 @@ namespace Shop
         {
             Console.WriteLine("Ваши приобретенные товары:\n");
 
-            if (_stackProducts.Count > 0)
+            if (StackProducts.Count > 0)
             {
-                for (int i = 0; i < _stackProducts.Count; i++)
+                for (int i = 0; i < StackProducts.Count; i++)
                 {
-                    Console.WriteLine($"Продукт - {_stackProducts[i].Product.Name} |  Куплено - {_stackProducts[i].Quantity}");
+                    Console.WriteLine($"Продукт - {StackProducts[i].Product.Name} |  Куплено - {StackProducts[i].Quantity}");
                 }
             }
             else
@@ -174,14 +178,22 @@ namespace Shop
             Console.WriteLine("\n\n\nОставшиеся деньги: " + Money);
         }
 
-        public void BuyProduct(Stack product, int quantity)
+        public void BuyProduct(Salesman salesman)
         {
-            int sum = product.Product.Price * quantity;
+            int sum = salesman.StackSellProduct.Product.Price * salesman.QuantitySellProduct;
 
             if (CheckSolvency(sum))
             {
                 Money -= sum;
-                AddProduct(new Stack(product.Product, quantity));
+                salesman.StackSellProduct.ReduceQuantity(salesman);
+                if (CheckSameProduct(salesman.StackSellProduct))
+                {
+                    AddSameProduct(salesman);
+                }
+                else
+                {
+                    AddProduct(new Stack(salesman.StackSellProduct.Product, salesman.QuantitySellProduct));
+                }
                 Console.WriteLine("Покупка прошла успешно!");
             }
             else
@@ -190,14 +202,33 @@ namespace Shop
             }
         }
 
-        public override void AddProduct(Stack product)
+        private void AddSameProduct(Salesman salesman)
         {
-            _stackProducts.Add(product);
+            for (int i = 0; i < StackProducts.Count; i++)
+            {
+                if (StackProducts[i].Product.Name == salesman.StackSellProduct.Product.Name)
+                {
+                    StackProducts[i].IncreaseQuantity(salesman);
+                }
+            }
         }
 
         private bool CheckSolvency(int sum)
         {
             return sum <= Money;
+        }
+
+        private bool CheckSameProduct(Stack product)
+        {
+            for (int i = 0; i < StackProducts.Count; i++)
+            {
+                if (StackProducts[i].Product.Name == product.Product.Name)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -210,6 +241,11 @@ namespace Shop
         {
             Product = product;
             Quantity = quantity;
+        }
+
+        public void IncreaseQuantity(Salesman salesman)
+        {
+            Quantity += salesman.QuantitySellProduct;
         }
 
         public void ReduceQuantity(Salesman salesman)
