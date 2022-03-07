@@ -14,13 +14,13 @@ namespace Shop
             Salesman salesman = new Salesman();
             Player player = new Player(random.Next(500, 1000));
 
-            salesman.AddProduct(new Product("Хлеб", 40, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Бутылка воды", 20, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Колбаса", 250, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Сыр", 200, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Чипсы", 70, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Сухарики", 30, random.Next(10, 50)));
-            salesman.AddProduct(new Product("Дошик", 20, random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Хлеб", 40), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Бутылка воды", 20), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Колбаса", 250), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Сыр", 200), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Чипсы", 70), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Сухарики", 30), random.Next(10, 50)));
+            salesman.AddProduct(new Stack(new Product("Дошик", 20), random.Next(10, 50)));
 
             bool isTrade = true;
 
@@ -73,10 +73,18 @@ namespace Shop
         ExitShop
     }
 
-    class Salesman
+    abstract class Member
+    {
+        protected List<Stack> _stackProducts = new List<Stack>();
+
+        abstract public void ShowListOfProducts();
+
+        abstract public void AddProduct(Stack products);
+    }
+
+    class Salesman : Member
     {
         public int QuantitySellProduct { get; private set; }
-        private List<Product> _products = new List<Product>();
 
         public void SellProduct(Player player)
         {
@@ -84,18 +92,18 @@ namespace Shop
             Console.WriteLine("Ваши деньги: " + player.Money);
             Console.SetCursorPosition(0, 0);
 
-            Product sellProduct;
-
             ShowListOfProducts();
             Console.Write("\nВыберите товар, который хотите приобрести: ");
             int numberProduct = Program.GetNumber(Console.ReadLine()) - 1;
             Console.Write("\nВведите кол-во товара, который хотите приобрести: ");
             QuantitySellProduct = Program.GetNumber(Console.ReadLine());
 
-            if (TrySellProduct(numberProduct, QuantitySellProduct, out sellProduct))
+            Stack product;
+
+            if (TrySellProduct(numberProduct, out product))
             {
-                player.BuyProduct(sellProduct, QuantitySellProduct);
-                sellProduct.ReduceQuantity(this);
+                player.BuyProduct(product, QuantitySellProduct);
+                product.ReduceQuantity(this);
             }
             else
             {
@@ -105,43 +113,102 @@ namespace Shop
             QuantitySellProduct = 0;
         }
 
-        public void AddProduct(Product product)
+        public override void AddProduct(Stack stackProducts)
         {
-            _products.Add(product);
+            _stackProducts.Add(stackProducts);
         }
 
-        public void ShowListOfProducts()
+        public override void ShowListOfProducts()
         {
-            for (int i = 0; i < _products.Count; i++)
+            for (int i = 0; i < _stackProducts.Count; i++)
             {
-                Console.WriteLine($"{i + 1}. Продукт - {_products[i].Name} | Цена - {_products[i].Price} | В наличии - {_products[i].Quantity}");
+                Console.WriteLine($"{i + 1}. Продукт - {_stackProducts[i].Product.Name} | Цена - {_stackProducts[i].Product.Price} | В наличии - {_stackProducts[i].Quantity}");
             }
         }
 
-        private bool TrySellProduct(int index, int quantity, out Product product)
+        private bool TrySellProduct(int index, out Stack product)
         {
             product = null;
 
-            if (quantity <= _products[index].Quantity)
+            if (index >= _stackProducts.Count || index < 0)
             {
-                product = _products[index];
+                return false;
+            }
+            else if (QuantitySellProduct <= _stackProducts[index].Quantity)
+            {
+                product = _stackProducts[index];
                 return true;
             }
-
-            return false;
+            else
+            {
+                return false;
+            }
         }
     }
 
-    class Product
+    class Player : Member
     {
-        public string Name { get; private set; }
-        public int Price { get; private set; }
+        public int Money { get; private set; }
+
+        public Player(int money)
+        {
+            Money = money;
+        }
+
+        public override void ShowListOfProducts()
+        {
+            Console.WriteLine("Ваши приобретенные товары:\n");
+
+            if (_stackProducts.Count > 0)
+            {
+                for (int i = 0; i < _stackProducts.Count; i++)
+                {
+                    Console.WriteLine($"Продукт - {_stackProducts[i].Product.Name} |  Куплено - {_stackProducts[i].Quantity}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("Вы ничего не покупали");
+            }
+
+            Console.WriteLine("\n\n\nОставшиеся деньги: " + Money);
+        }
+
+        public void BuyProduct(Stack product, int quantity)
+        {
+            int sum = product.Product.Price * quantity;
+
+            if (CheckSolvency(sum))
+            {
+                Money -= sum;
+                AddProduct(new Stack(product.Product, quantity));
+                Console.WriteLine("Покупка прошла успешно!");
+            }
+            else
+            {
+                Console.WriteLine("У вас не хватило денег. Покупка отменена");
+            }
+        }
+
+        public override void AddProduct(Stack product)
+        {
+            _stackProducts.Add(product);
+        }
+
+        private bool CheckSolvency(int sum)
+        {
+            return sum <= Money;
+        }
+    }
+
+    class Stack
+    {
+        public Product Product { get; private set; }
         public int Quantity { get; private set; }
 
-        public Product(string name, int price, int quantity)
+        public Stack(Product product, int quantity)
         {
-            Name = name;
-            Price = price;
+            Product = product;
             Quantity = quantity;
         }
 
@@ -159,75 +226,19 @@ namespace Shop
 
         private bool CheckQuantity(int quantity)
         {
-            if (quantity <= Quantity)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            return quantity <= Quantity;
         }
     }
 
-    class Player
+    class Product
     {
-        private List<Product> _products = new List<Product>();
-        public int Money { get; private set; }
+        public string Name { get; private set; }
+        public int Price { get; private set; }
 
-        public Player(int money)
+        public Product(string name, int price)
         {
-            Money = money;
-        }
-
-        public void ShowListOfProducts()
-        {
-            Console.WriteLine("Ваши приобретенные товары:\n");
-
-            if (_products.Count > 0)
-            {
-                for (int i = 0; i < _products.Count; i++)
-                {
-                    Console.WriteLine($"Продукт - {_products[i].Name} |  Куплено - {_products[i].Quantity}");
-                }
-            }
-            else
-            {
-                Console.WriteLine("Вы ничего не покупали");
-            }
-
-            Console.WriteLine("\n\n\nОставшиеся деньги: " + Money);
-        }
-
-        public void BuyProduct(Product product, int quantity)
-        {
-            if (CheckSolvency(product, quantity))
-            {
-                Money -= product.Price * quantity;
-                AddProduct(new Product(product.Name, product.Price, quantity));
-                Console.WriteLine("Покупка прошла успешно!");
-            }
-            else
-            {
-                Console.WriteLine("У вас не хватило денег. Покупка отменена");
-            }
-        }
-
-        private void AddProduct(Product product)
-        {
-            _products.Add(product);
-        }
-
-        private bool CheckSolvency(Product product, int quantity)
-        {
-            if (product.Price * quantity <= Money)
-            {
-                return true;
-            }
-            else
-            {
-                return false;
-            }
+            Name = name;
+            Price = price;
         }
     }
 }
